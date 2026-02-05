@@ -16,6 +16,7 @@ const App = () => {
   const [bulkUsers, setBulkUsers] = useState([]);
   const [showBulk, setShowBulk] = useState(false);
   const [selectedUserIdx, setSelectedUserIdx] = useState(null);
+  const [copySuccess, setCopySuccess] = useState('');
   const fileInputRef = useRef(null);
   const bgInputRef = useRef(null);
   const csvInputRef = useRef(null);
@@ -88,6 +89,41 @@ const App = () => {
   };
 
   const getViewport = () => { if (activeTab === 'mobile') return { width: '380px', isMobile: true }; return { width: '760px', isMobile: false }; };
+
+  const generateSignatureHTML = (userData = formData) => {
+    const d = userData;
+    const hasSocial = d.tiktok || d.linkedin || d.instagram;
+    const cardBgColor = hexToRgba(colors.cardBg, colors.cardOpacity);
+    
+    return `<table cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:760px;background-color:${colors.mainBg};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;"><tr><td style="padding:24px 24px 12px 24px;"><table cellpadding="0" cellspacing="0" border="0" style="width:100%;"><tr>${(d.name || d.title) ? `<td style="width:${layout.cardWidth}%;vertical-align:middle;"><div style="background:${cardBgColor};border-radius:${layout.cardRadius}px;padding:24px 32px;">${d.name ? `<div style="font-size:30px;font-weight:700;color:${colors.textColor};line-height:1.2;margin-bottom:${d.title ? '4px' : '0'};">${d.name}</div>` : ''}${d.title ? `<div style="font-size:18px;font-weight:400;color:${colors.textColor};opacity:0.95;">${d.title}</div>` : ''}</div></td>` : ''}<td style="vertical-align:middle;text-align:right;padding-left:20px;"><table cellpadding="0" cellspacing="0" border="0" style="margin-left:auto;"><tr><td style="vertical-align:middle;padding-right:16px;"><div style="width:80px;height:80px;background:${colors.textColor};border-radius:50%;opacity:0.2;"></div></td><td style="vertical-align:middle;text-align:left;">${formData.companyName ? `<div style="font-size:26px;font-weight:700;color:${colors.textColor};line-height:1.15;">${formData.companyName.replace(/\n/g, '<br/>')}</div>` : ''}${formData.tagline ? `<div style="font-size:13px;font-style:italic;color:${colors.textColor};font-weight:500;margin-top:8px;opacity:0.95;">${formData.tagline}</div>` : ''}</td></tr></table></td></tr></table></td></tr><tr><td style="padding:18px 24px;"><table cellpadding="0" cellspacing="0" border="0" style="width:100%;"><tr>${d.email ? `<td style="vertical-align:middle;"><a href="mailto:${d.email}" style="color:${colors.textColor};font-size:15px;font-weight:500;text-decoration:none;">✉ ${d.email}</a></td>` : ''}${d.phone ? `<td style="vertical-align:middle;"><a href="tel:${d.phone}" style="color:${colors.textColor};font-size:15px;font-weight:500;text-decoration:none;">📱 ${d.phone}</a></td>` : ''}${hasSocial ? `<td style="vertical-align:middle;">${d.tiktok ? `<a href="${d.tiktok}" style="color:${colors.textColor};text-decoration:none;margin-right:8px;">TikTok</a>` : ''}${d.linkedin ? `<a href="${d.linkedin}" style="color:${colors.textColor};text-decoration:none;margin-right:8px;">LinkedIn</a>` : ''}${d.instagram ? `<a href="${d.instagram}" style="color:${colors.textColor};text-decoration:none;">Instagram</a>` : ''}</td>` : ''}${formData.website ? `<td style="vertical-align:middle;text-align:right;"><a href="https://${formData.website}" style="color:${colors.textColor};font-size:15px;font-weight:600;text-decoration:none;">${formData.website}</a></td>` : ''}</tr></table></td></tr></table>`;
+  };
+
+  const copyToClipboard = async () => {
+    const html = generateSignatureHTML();
+    try {
+      await navigator.clipboard.writeText(html);
+      setCopySuccess('copied');
+      setTimeout(() => setCopySuccess(''), 3000);
+    } catch (err) {
+      setCopySuccess('error');
+      setTimeout(() => setCopySuccess(''), 3000);
+    }
+  };
+
+  const downloadHTML = () => {
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Email Signature</title></head><body>${generateSignatureHTML()}</body></html>`;
+    const blob = new Blob([html], { type: 'text/html' }); const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `signature-${formData.name.replace(/[^a-z0-9]/gi, '-').toLowerCase()}.html`; a.click(); URL.revokeObjectURL(url);
+  };
+
+  const downloadAllSignatures = () => {
+    if (bulkUsers.length === 0) return;
+    let allHTML = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>All Signatures</title><style>.sig{margin:40px 0;border-bottom:2px solid #eee;padding-bottom:20px;}</style></head><body>';
+    bulkUsers.forEach((user, idx) => { allHTML += `<div class="sig"><h3>${idx + 1}. ${user.name}</h3>${generateSignatureHTML({ ...formData, ...user })}</div>`; });
+    allHTML += '</body></html>';
+    const blob = new Blob([allHTML], { type: 'text/html' }); const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'all-signatures.html'; a.click(); URL.revokeObjectURL(url);
+  };
 
   const Icons = {
     email: (c) => <svg width="24" height="24" viewBox="0 0 24 24" fill={c}><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>,
@@ -283,12 +319,16 @@ const App = () => {
             </div>
           </div>
           <div style={{ background: '#fff', borderRadius: '16px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
               <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#0f172a' }}>Preview</h2>
-              <div style={{ display: 'flex', gap: '4px', background: '#f1f5f9', padding: '4px', borderRadius: '8px' }}>
-                {['desktop', 'tablet', 'mobile'].map(tab => (<button key={tab} onClick={() => setActiveTab(tab)} style={{ padding: '6px 14px', border: 'none', borderRadius: '5px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize', background: activeTab === tab ? '#fff' : 'transparent', color: activeTab === tab ? '#0f172a' : '#64748b', boxShadow: activeTab === tab ? '0 1px 2px rgba(0,0,0,0.08)' : 'none' }}>{tab}</button>))}
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <button onClick={copyToClipboard} style={{ padding: '8px 16px', background: copySuccess === 'copied' ? '#10b981' : '#F7941D', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>{copySuccess === 'copied' ? '✓ Copied!' : '📋 Copy HTML'}</button>
+                <button onClick={downloadHTML} style={{ padding: '8px 16px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>💾 Download</button>
+                {bulkUsers.length > 0 && <button onClick={downloadAllSignatures} style={{ padding: '8px 16px', background: '#8b5cf6', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>📦 All ({bulkUsers.length})</button>}
               </div>
             </div>
+            <div style={{ marginBottom: '16px', padding: '12px 16px', background: '#f0fdf4', borderRadius: '8px', border: '1px solid #bbf7d0' }}><p style={{ fontSize: '12px', color: '#166534', margin: 0 }}><strong>How to use:</strong> Click "Copy HTML" then paste into your email signature settings.<br/><span style={{ opacity: 0.8 }}>Gmail: Settings → Signature | Outlook: File → Options → Mail → Signatures</span></p></div>
+            <div style={{ display: 'flex', gap: '4px', background: '#f1f5f9', padding: '4px', borderRadius: '8px', marginBottom: '16px' }}>{['desktop', 'tablet', 'mobile'].map(tab => (<button key={tab} onClick={() => setActiveTab(tab)} style={{ padding: '6px 14px', border: 'none', borderRadius: '5px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize', background: activeTab === tab ? '#fff' : 'transparent', color: activeTab === tab ? '#0f172a' : '#64748b', boxShadow: activeTab === tab ? '0 1px 2px rgba(0,0,0,0.08)' : 'none' }}>{tab}</button>))}</div>
             <div style={{ background: '#f1f5f9', borderRadius: '10px', padding: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '220px' }}><SignaturePreview/></div>
             {showBulk && bulkUsers.length > 0 && (
               <div style={{ marginTop: '20px' }}>
